@@ -71,12 +71,18 @@
       background: #fff;
     }
 
+    /* 支援下拉選單與手動輸入的分類欄位 */
     .upload-card input[type="text"] {
       border: 1px solid #cbd5e1;
       padding: 8px 12px;
       border-radius: 6px;
       font-size: 0.9rem;
       outline: none;
+      width: 180px;
+    }
+
+    .upload-card input[type="text"]:focus {
+      border-color: #3b82f6;
     }
 
     .btn-upload {
@@ -117,10 +123,10 @@
       border-color: #3b82f6;
     }
 
-    /* 圖片卡片格狀排列 (維持截圖樣式) */
+    /* 圖片卡片格狀排列 */
     .gallery-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
       gap: 16px;
     }
 
@@ -137,11 +143,11 @@
     .photo-thumb-wrap {
       width: 100%;
       height: 160px;
-      background-color: #e2e8f0;
+      background-color: #f1f5f9;
       overflow: hidden;
     }
 
-    /* 圖片設定：雙擊放大互動提示 */
+    /* 縮圖樣式：提示連點雙擊可放大 */
     .photo-thumb {
       width: 100%;
       height: 100%;
@@ -200,7 +206,7 @@
     }
 
     /* ==================================================== */
-    /* 【關鍵新增】放大檢視燈箱 (Lightbox Modal) 樣式設計   */
+    /* 放大檢視燈箱 (Lightbox Modal) 樣式                  */
     /* ==================================================== */
     .modal-overlay {
       position: fixed;
@@ -208,13 +214,13 @@
       left: 0;
       width: 100vw;
       height: 100vh;
-      background-color: rgba(0, 0, 0, 0.85);
+      background-color: rgba(0, 0, 0, 0.88);
       display: none;                /* 預設隱藏 */
       align-items: center;
       justify-content: center;
-      z-index: 9999;                /* 最上層顯示 */
-      cursor: pointer;              /* 點擊可關閉 */
-      backdrop-filter: blur(2px);
+      z-index: 9999;
+      cursor: pointer;
+      backdrop-filter: blur(3px);
     }
 
     .modal-overlay.active {
@@ -227,17 +233,19 @@
       max-height: 90vh;
       object-fit: contain;
       border-radius: 6px;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+      box-shadow: 0 4px 25px rgba(0, 0, 0, 0.6);
       cursor: pointer;
-      transition: transform 0.2s ease;
     }
 
-    .modal-hint {
+    .modal-tip {
       position: absolute;
-      bottom: 20px;
+      bottom: 24px;
       color: rgba(255, 255, 255, 0.7);
       font-size: 0.85rem;
       pointer-events: none;
+      background: rgba(0, 0, 0, 0.4);
+      padding: 4px 12px;
+      border-radius: 12px;
     }
 
     @keyframes fadeIn {
@@ -256,14 +264,17 @@
     <button class="btn-refresh" onclick="loadPhotos()">🔄 手動重新整理</button>
   </div>
 
-  <!-- 上傳區 -->
+  <!-- 上傳區 (保留下拉選單 + 可自填邏輯) -->
   <div class="upload-card">
     <input type="file" id="fileInput" multiple accept="image/*">
-    <input type="text" id="categoryInput" placeholder="輸入分類 (整批)">
+    <input type="text" id="categoryInput" list="categoryOptions" placeholder="輸入分類 (整批)">
+    <datalist id="categoryOptions">
+      <!-- 程式會依現有照片分類自動更新此清單 -->
+    </datalist>
     <button class="btn-upload" onclick="startBatchUpload()">批次上傳</button>
   </div>
 
-  <!-- 分類篩選列 -->
+  <!-- 分類篩選標籤列 -->
   <div class="filter-bar" id="categoryTabs">
     <button class="tag-btn active" onclick="filterCategory('全部')">全部</button>
   </div>
@@ -271,21 +282,19 @@
   <!-- 照片陳列區 -->
   <div class="gallery-grid" id="photoGallery"></div>
 
-  <!-- 【關鍵新增】放大照片檢視容器（點擊任意處立即關閉返回原狀態） -->
+  <!-- 放大檢視燈箱容器（擊點放大後的照片或背景即退回原畫面） -->
   <div id="imageModal" class="modal-overlay" onclick="closeModal()">
-    <img id="modalImg" class="modal-img" src="" alt="放大照片檢視">
-    <div class="modal-hint">點擊任意處關閉放大視圖</div>
+    <img id="modalImg" class="modal-img" src="" alt="放大照片">
+    <div class="modal-tip">點擊任意處可關閉放大檢視</div>
   </div>
 
   <script>
-    // 若為部屬成獨立 Web App，請將 GAS_API_URL 設為 GAS 部屬網址
-    // 若使用 Google.script.run，可自行適配
+    // 若為部屬成獨立 Web App，此處會自動注入 GAS 服務網址
     const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxx0t3Pz5DKYrPztCw07T8akmMzCcBZ9Dlzx-a5L9EmZS181SWgKzm-Wclz7Wg5cndDnA/exec"; 
 
     let photosData = [];
     let currentCategory = "全部";
 
-    // 頁面載入時取得資料
     window.addEventListener("DOMContentLoaded", () => {
       loadPhotos();
     });
@@ -295,14 +304,25 @@
       try {
         const res = await fetch(GAS_API_URL);
         photosData = await res.json();
-        buildCategoryTabs();
-        renderGallery();
+        
+        updateCategoryOptions(); // 更新輸入框的下拉清單
+        buildCategoryTabs();     // 更新頂部分類標籤按鈕
+        renderGallery();         // 繪製卡片
       } catch (err) {
         console.error("載入失敗:", err);
       }
     }
 
-    // 建立分類標籤清單
+    // 【原設計保留】自動解析現有分類並更新輸入框的 datalist 下拉選單
+    function updateCategoryOptions() {
+      const datalist = document.getElementById("categoryOptions");
+      // 提取出所有不重複的有效分類
+      const uniqueCats = [...new Set(photosData.map(p => p.category).filter(c => c && c !== "未分類"))];
+      
+      datalist.innerHTML = uniqueCats.map(cat => `<option value="${cat}">`).join('');
+    }
+
+    // 建立頂部過濾標籤清單
     function buildCategoryTabs() {
       const categories = ["全部", ...new Set(photosData.map(p => p.category))];
       const tabsContainer = document.getElementById("categoryTabs");
@@ -312,7 +332,7 @@
       `).join('');
     }
 
-    // 切換分類
+    // 切換分類檢視
     function filterCategory(cat) {
       currentCategory = cat;
       buildCategoryTabs();
@@ -326,29 +346,35 @@
         ? photosData 
         : photosData.filter(p => p.category === currentCategory);
 
-      container.innerHTML = list.map(item => `
-        <div class="photo-card">
-          <div class="photo-thumb-wrap">
-            <!-- 【關鍵修改】新增 ondblclick 雙擊放大事件，傳入大圖連結 -->
-            <img class="photo-thumb" 
-                 src="${item.url}" 
-                 alt="${item.name}" 
-                 title="連按兩下放大檢視"
-                 ondblclick="openModal('${item.url.replace('&sz=w800', '&sz=w1600')}')">
-          </div>
-          <div class="photo-info">
-            <div class="photo-name" title="${item.name}">${item.name}</div>
-            <div class="photo-footer">
-              <span class="photo-badge">${item.category}</span>
-              <button class="btn-delete" onclick="deletePhotoItem('${item.id}')">刪除</button>
+      container.innerHTML = list.map(item => {
+        // 大圖採用高畫質 thumbnail 參數 (w1600)
+        const bigImageUrl = item.url.replace('&sz=w800', '&sz=w1600');
+
+        return `
+          <div class="photo-card">
+            <div class="photo-thumb-wrap">
+              <!-- 【放大功能】ondblclick 連按兩下放大照片 -->
+              <img class="photo-thumb" 
+                   src="${item.url}" 
+                   alt="${item.name}" 
+                   title="連按兩下放大照片"
+                   data-full="${bigImageUrl}"
+                   ondblclick="openModal(this.dataset.full)">
+            </div>
+            <div class="photo-info">
+              <div class="photo-name" title="${item.name}">${item.name}</div>
+              <div class="photo-footer">
+                <span class="photo-badge">${item.category}</span>
+                <button class="btn-delete" onclick="deletePhotoItem('${item.id}')">刪除</button>
+              </div>
             </div>
           </div>
-        </div>
-      `).join('');
+        `;
+      }).join('');
     }
 
     // ====================================================
-    // 【關鍵新增】連點兩下放大、點擊一下關閉之核心邏輯
+    // 放大與還原控制邏輯
     // ====================================================
     function openModal(imageSrc) {
       const modal = document.getElementById("imageModal");
@@ -361,15 +387,15 @@
       const modal = document.getElementById("imageModal");
       const modalImg = document.getElementById("modalImg");
       modal.classList.remove("active");
-      modalImg.src = ""; // 清除 src 釋放記憶體
+      modalImg.src = "";
     }
 
-    // 支援按下鍵盤 ESC 鍵亦可退出放大狀態
+    // 鍵盤按 ESC 亦可關閉
     window.addEventListener("keydown", (e) => {
       if (e.key === "Escape") closeModal();
     });
 
-    // 刪除處理
+    // 刪除相片
     async function deletePhotoItem(id) {
       const pwd = prompt("請輸入管理密碼：");
       if (!pwd) return;
@@ -391,10 +417,12 @@
       }
     }
 
-    // 批次上傳（維持原後端的分段/單檔上傳支援）
+    // 批次上傳
     async function startBatchUpload() {
-      const files = document.getElementById("fileInput").files;
+      const fileInput = document.getElementById("fileInput");
+      const files = fileInput.files;
       const category = document.getElementById("categoryInput").value.trim() || "未分類";
+
       if (!files.length) {
         alert("請選擇照片");
         return;
@@ -419,7 +447,7 @@
         });
       }
       alert("上傳完成！");
-      document.getElementById("fileInput").value = "";
+      fileInput.value = "";
       loadPhotos();
     }
 
