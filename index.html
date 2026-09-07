@@ -1,516 +1,464 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="referrer" content="no-referrer">
-    <title>遺失物照片管理系統 (自動編號版)</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>遺失物照片管理</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
 
-    <style>
-        :root { --primary: #4285f4; --danger: #dc3545; --bg: #f8f9fa; --card: #fff; --text: #333; }
-        body { font-family: "Microsoft JhengHei", sans-serif; background: var(--bg); padding: 20px; color: var(--text); }
+    body {
+      background-color: #f8fafc;
+      color: #334155;
+      padding: 24px;
+    }
 
-        #loadingOverlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(255,255,255,0.98); z-index: 9999;
-            display: flex; justify-content: center; align-items: center; flex-direction: column;
-            transition: opacity 0.3s;
-        }
-        .spinner {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid var(--primary);
-            border-radius: 50%;
-            width: 40px; height: 40px;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin { 100% { transform: rotate(360deg); } }
+    /* 頂部標題列 */
+    .header-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
 
-        #errorMsg { color: var(--danger); margin-top: 15px; font-weight: bold; display: none; }
-        #forceCloseBtn {
-            margin-top: 20px; padding: 8px 16px; background: #666; color: white;
-            border: none; border-radius: 4px; cursor: pointer; display: none;
-        }
+    .header-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
 
-        #modalOverlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.5); z-index: 3000;
-            display: none; justify-content: center; align-items: center;
-        }
-        #modalBox {
-            background: #fff; padding: 25px; border-radius: 10px; width: 90%; max-width: 320px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2); text-align: center;
-        }
-        #modalTitle { margin-top: 0; color: var(--primary); }
-        #modalDesc { font-size: 0.9em; margin-bottom: 15px; color: #666; }
-        #pwdInput {
-            width: 100%; padding: 10px; margin-bottom: 20px;
-            border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box;
-        }
-        .modal-btns { display: flex; gap: 10px; }
-        .modal-btns button {
-            flex: 1; padding: 10px; border: none; border-radius: 5px;
-            cursor: pointer; font-weight: bold;
-        }
-        #btnConfirm { background: var(--primary); color: #fff; }
-        #btnCancel { background: #eee; color: #333; }
+    .btn-refresh {
+      background: white;
+      border: 1px solid #cbd5e1;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
 
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .refresh-btn {
-            background: none; border: 1px solid #ddd; padding: 5px 10px;
-            cursor: pointer; border-radius: 4px; font-size: 0.8em;
-        }
-        .refresh-btn:hover { background: #eee; }
+    .btn-refresh:hover {
+      background: #f1f5f9;
+    }
 
-        .upload-box {
-            background: var(--card); padding: 20px; border-radius: 10px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-            display: flex; gap: 10px; flex-wrap: wrap;
-            margin-bottom: 20px; align-items: center;
-        }
-        input[type="file"], input[type="text"] { padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
-        button.action-btn { background: var(--primary); color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; }
-        button.action-btn:hover { opacity: 0.9; }
+    /* 上傳控制區塊 */
+    .upload-card {
+      background: white;
+      border-radius: 8px;
+      padding: 16px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
 
-        .filters { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 10px; margin-bottom: 10px; }
-        .filter-btn { background: #fff; border: 1px solid #ddd; padding: 5px 15px; border-radius: 20px; cursor: pointer; white-space: nowrap; }
-        .filter-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+    .upload-card input[type="file"] {
+      border: 1px solid #cbd5e1;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      background: #fff;
+    }
 
-        .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 15px; }
-        .card {
-            background: var(--card); border-radius: 8px; overflow: hidden;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            display: flex; flex-direction: column;
-        }
-        .img-wrap { height: 150px; background: #eee; overflow: hidden; }
-        .img-wrap img { width: 100%; height: 100%; object-fit: cover; transition: 0.3s; }
-        .img-wrap img:hover { transform: scale(1.05); }
-        .info { padding: 10px; }
-        .name { font-weight: bold; font-size: 0.9em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 5px; }
-        .meta { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
-        .cat-tag { font-size: 0.75em; background: #f0f0f0; padding: 2px 6px; border-radius: 4px; color: #555; }
-        .btn-del {
-            background: #fff0f0; color: var(--danger);
-            border: 1px solid #ffcccc; padding: 4px 10px;
-            border-radius: 4px; font-size: 0.8em; cursor: pointer;
-        }
-        .btn-del:hover { background: var(--danger); color: #fff; border-color: var(--danger); }
-    </style>
+    /* 支援下拉選單與手動輸入的分類欄位 */
+    .upload-card input[type="text"] {
+      border: 1px solid #cbd5e1;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      outline: none;
+      width: 180px;
+    }
+
+    .upload-card input[type="text"]:focus {
+      border-color: #3b82f6;
+    }
+
+    .btn-upload {
+      background-color: #3b82f6;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+
+    .btn-upload:hover {
+      background-color: #2563eb;
+    }
+
+    /* 標籤分類篩選列 */
+    .filter-bar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+
+    .tag-btn {
+      background: white;
+      border: 1px solid #e2e8f0;
+      padding: 6px 16px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .tag-btn.active {
+      background: #3b82f6;
+      color: white;
+      border-color: #3b82f6;
+    }
+
+    /* 圖片卡片格狀排列 */
+    .gallery-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 16px;
+    }
+
+    .photo-card {
+      background: white;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      display: flex;
+      flex-direction: column;
+      border: 1px solid #e2e8f0;
+    }
+
+    .photo-thumb-wrap {
+      width: 100%;
+      height: 160px;
+      background-color: #f1f5f9;
+      overflow: hidden;
+    }
+
+    /* 縮圖樣式：提示連點雙擊可放大 */
+    .photo-thumb {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      cursor: pointer;
+      user-select: none;
+      transition: transform 0.2s;
+    }
+
+    .photo-thumb:hover {
+      transform: scale(1.02);
+    }
+
+    .photo-info {
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .photo-name {
+      font-size: 0.85rem;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: #1e293b;
+    }
+
+    .photo-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .photo-badge {
+      font-size: 0.75rem;
+      background: #f1f5f9;
+      color: #64748b;
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+
+    .btn-delete {
+      color: #ef4444;
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      cursor: pointer;
+    }
+
+    .btn-delete:hover {
+      background: #fee2e2;
+    }
+
+    /* ==================================================== */
+    /* 放大檢視燈箱 (Lightbox Modal) 樣式                  */
+    /* ==================================================== */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background-color: rgba(0, 0, 0, 0.88);
+      display: none;                /* 預設隱藏 */
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      cursor: pointer;
+      backdrop-filter: blur(3px);
+    }
+
+    .modal-overlay.active {
+      display: flex;
+      animation: fadeIn 0.15s ease-out;
+    }
+
+    .modal-img {
+      max-width: 90vw;
+      max-height: 90vh;
+      object-fit: contain;
+      border-radius: 6px;
+      box-shadow: 0 4px 25px rgba(0, 0, 0, 0.6);
+      cursor: pointer;
+    }
+
+    .modal-tip {
+      position: absolute;
+      bottom: 24px;
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 0.85rem;
+      pointer-events: none;
+      background: rgba(0, 0, 0, 0.4);
+      padding: 4px 12px;
+      border-radius: 12px;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+  </style>
 </head>
-
 <body>
 
-<div id="loadingOverlay">
-    <div class="spinner" id="spinner"></div>
-    <div id="loadingText" style="margin-top:15px; color:#555;">系統初始化中...</div>
-    <div id="errorMsg"></div>
-    <button id="forceCloseBtn" onclick="forceHideLoading()">關閉視窗</button>
-</div>
-
-<div id="modalOverlay">
-    <div id="modalBox">
-        <h3 id="modalTitle">驗證</h3>
-        <p id="modalDesc">請輸入密碼以繼續</p>
-        <input type="password" id="pwdInput" placeholder="請輸入密碼">
-        <div class="modal-btns">
-            <button id="btnCancel">取消</button>
-            <button id="btnConfirm">確認</button>
-        </div>
+  <!-- 頂部列 -->
+  <div class="header-bar">
+    <div class="header-title">
+      📁 遺失物照片管理
     </div>
-</div>
+    <button class="btn-refresh" onclick="loadPhotos()">🔄 手動重新整理</button>
+  </div>
 
-<div class="container">
-    <div class="header">
-        <h3 style="margin:0;">📂 遺失物照片管理</h3>
-        <button class="refresh-btn" onclick="fetchPhotos()">🔄 手動重新整理</button>
-    </div>
+  <!-- 上傳區 (保留下拉選單 + 可自填邏輯) -->
+  <div class="upload-card">
+    <input type="file" id="fileInput" multiple accept="image/*">
+    <input type="text" id="categoryInput" list="categoryOptions" placeholder="輸入分類 (整批)">
+    <datalist id="categoryOptions">
+      <!-- 程式會依現有照片分類自動更新此清單 -->
+    </datalist>
+    <button class="btn-upload" onclick="startBatchUpload()">批次上傳</button>
+  </div>
 
-    <div class="upload-box">
-        <input type="file" id="fileInput" accept="image/*" multiple>
-        <input type="text" id="catInput" list="catList" placeholder="輸入分類 (整批)">
-        <datalist id="catList"></datalist>
-        <button class="action-btn" onclick="prepareUpload()">批次上傳</button>
-    </div>
+  <!-- 分類篩選標籤列 -->
+  <div class="filter-bar" id="categoryTabs">
+    <button class="tag-btn active" onclick="filterCategory('全部')">全部</button>
+  </div>
 
-    <div class="filters" id="filterBox"></div>
-    <div class="gallery" id="galleryBox"></div>
-</div>
+  <!-- 照片陳列區 -->
+  <div class="gallery-grid" id="photoGallery"></div>
 
-<script>
-    // ============================================
-    // 【請在此處填入您的 Apps Script 網址】
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxx0t3Pz5DKYrPztCw07T8akmMzCcBZ9Dlzx-a5L9EmZS181SWgKzm-Wclz7Wg5cndDnA/exec";
-    // ============================================
+  <!-- 放大檢視燈箱容器（擊點放大後的照片或背景即退回原畫面） -->
+  <div id="imageModal" class="modal-overlay" onclick="closeModal()">
+    <img id="modalImg" class="modal-img" src="" alt="放大照片">
+    <div class="modal-tip">點擊任意處可關閉放大檢視</div>
+  </div>
 
-    let allPhotos = [];
-    let currentAction = null;
-    let targetId = null;
-    let isFetching = false;
-    let hasLoadedOnce = false;
+  <script>
+    // 若為部屬成獨立 Web App，此處會自動注入 GAS 服務網址
+    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxx0t3Pz5DKYrPztCw07T8akmMzCcBZ9Dlzx-a5L9EmZS181SWgKzm-Wclz7Wg5cndDnA/exec"; 
 
-    // -----------------------------
-    // 1. 讀取列表
-    // -----------------------------
-    function fetchPhotos() {
-        if (isFetching) return;
-        isFetching = true;
+    let photosData = [];
+    let currentCategory = "全部";
 
-        if (hasLoadedOnce) showLoading(true, "更新列表中...");
-
-        const timestamp = Date.now();
-
-        fetch(`${SCRIPT_URL}?v=${timestamp}`, {
-            method: "GET",
-            cache: "no-store"
-        })
-        .then(res => res.json())
-        .then(data => {
-            allPhotos = Array.isArray(data) ? data : [];
-            renderUI();
-            hasLoadedOnce = true;
-            showLoading(false);
-        })
-        .catch(err => {
-            console.error(err);
-            const txt = document.getElementById('loadingText');
-            const spinner = document.getElementById('spinner');
-            const btn = document.getElementById('forceCloseBtn');
-
-            if (txt) txt.innerText = "讀取失敗，請檢查網路或 SCRIPT_URL";
-            if (spinner) spinner.style.display = "none";
-            if (btn) btn.style.display = "block";
-
-            setTimeout(() => showLoading(false), 3500);
-        })
-        .finally(() => {
-            isFetching = false;
-        });
-    }
-
-    // -----------------------------
-    // 2. 準備上傳
-    // -----------------------------
-    function prepareUpload() {
-        const files = document.getElementById('fileInput').files;
-        if (files.length === 0) { alert("請至少選擇一張照片"); return; }
-
-        // 檢查大小 (30MB)
-        for (let i = 0; i < files.length; i++) {
-            if (files[i].size > 30 * 1024 * 1024) {
-                alert(`檔案 "${files[i].name}" 過大 (>30MB)，請移除`);
-                return;
-            }
-        }
-        openModal('upload', null, "批次上傳驗證", `共 ${files.length} 張，請輸入密碼：`);
-    }
-
-    // -----------------------------
-    // 3. 準備刪除
-    // -----------------------------
-    window.prepareDelete = function(id) {
-        if (!id) return;
-        openModal('delete', id, "確認刪除照片", "刪除後將移至垃圾桶，請輸入密碼：");
-    };
-
-    // -----------------------------
-    // 彈窗
-    // -----------------------------
-    const modal = document.getElementById('modalOverlay');
-    const pwdInput = document.getElementById('pwdInput');
-    const modalTitle = document.getElementById('modalTitle');
-    const modalDesc = document.getElementById('modalDesc');
-
-    function openModal(action, id, title, desc) {
-        currentAction = action;
-        targetId = id;
-        modalTitle.innerText = title;
-        modalDesc.innerText = desc || "請輸入密碼：";
-        pwdInput.value = "";
-        modal.style.display = 'flex';
-        setTimeout(() => pwdInput.focus(), 50);
-    }
-
-    document.getElementById('btnCancel').onclick = () => modal.style.display = 'none';
-
-    document.getElementById('btnConfirm').onclick = () => {
-        const pwd = pwdInput.value;
-        if (!pwd) { alert("請輸入密碼"); return; }
-        modal.style.display = 'none';
-
-        if (currentAction === 'upload') doBatchUpload(pwd);
-        if (currentAction === 'delete') doDelete(pwd);
-    };
-
-    // Enter 直接確認
-    pwdInput.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") document.getElementById("btnConfirm").click();
+    window.addEventListener("DOMContentLoaded", () => {
+      loadPhotos();
     });
 
-    // -----------------------------
-    // 批次上傳 (分片上傳)
-    // -----------------------------
-    async function doBatchUpload(password) {
-        const files = document.getElementById('fileInput').files;
-        const category = document.getElementById('catInput').value.trim() || "未分類";
-        let success = 0, fail = 0;
-
-        showLoading(true, "準備上傳...");
-
-        for (let i = 0; i < files.length; i++) {
-            const file = files[i];
-            const uniqueId = Date.now().toString() + "_" + i;
-
-            try {
-                const fullBase64 = await readFileAsBase64(file);
-                const cleanBase64 = fullBase64.split(',')[1];
-
-                // 分片 (1.5MB)
-                const CHUNK_SIZE = 1.5 * 1024 * 1024;
-                const totalChunks = Math.ceil(cleanBase64.length / CHUNK_SIZE);
-                let finalName = "";
-
-                for (let j = 0; j < totalChunks; j++) {
-                    const chunk = cleanBase64.slice(j * CHUNK_SIZE, (j + 1) * CHUNK_SIZE);
-                    const pct = Math.round(((j + 1) / totalChunks) * 100);
-
-                    const txt = document.getElementById('loadingText');
-                    if (txt) {
-                        txt.innerText = `正在上傳 (${i + 1}/${files.length}): ${file.name} (${pct}%)`;
-                    }
-
-                    const result = await sendChunk({
-                        action: 'upload_chunk',
-                        password: password,
-                        fileId: uniqueId,
-                        chunk: chunk,
-                        index: j,
-                        total: totalChunks,
-                        filename: file.name,
-                        mimeType: file.type,
-                        category: category
-                    });
-
-                    if (!result || result.status === 'error') {
-                        throw new Error(result?.message || "上傳失敗");
-                    }
-
-                    // 最後一片會回傳新檔名
-                    if (result.name) finalName = result.name;
-                }
-
-                console.log(`上傳成功: ${file.name} -> ${finalName}`);
-                success++;
-            } catch (err) {
-                console.error(err);
-                fail++;
-            }
-        }
-
-        showLoading(false);
-        alert(`完成。\n成功: ${success}\n失敗: ${fail}`);
-
-        if (success > 0) {
-            document.getElementById('fileInput').value = "";
-            fetchPhotos();
-        }
+    // 取得所有照片資料
+    async function loadPhotos() {
+      try {
+        const res = await fetch(GAS_API_URL);
+        photosData = await res.json();
+        
+        updateCategoryOptions(); // 更新輸入框的下拉清單
+        buildCategoryTabs();     // 更新頂部分類標籤按鈕
+        renderGallery();         // 繪製卡片
+      } catch (err) {
+        console.error("載入失敗:", err);
+      }
     }
 
-    function sendChunk(payload) {
-        return fetch(SCRIPT_URL, {
-            method: 'POST',
-            cache: "no-store",
-            headers: { "Content-Type": "text/plain;charset=utf-8" },
-            body: JSON.stringify(payload)
-        }).then(res => res.json());
+    // 【原設計保留】自動解析現有分類並更新輸入框的 datalist 下拉選單
+    function updateCategoryOptions() {
+      const datalist = document.getElementById("categoryOptions");
+      // 提取出所有不重複的有效分類
+      const uniqueCats = [...new Set(photosData.map(p => p.category).filter(c => c && c !== "未分類"))];
+      
+      datalist.innerHTML = uniqueCats.map(cat => `<option value="${cat}">`).join('');
     }
 
-    function readFileAsBase64(file) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = (e) => resolve(e.target.result);
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-        });
+    // 建立頂部過濾標籤清單
+    function buildCategoryTabs() {
+      const categories = ["全部", ...new Set(photosData.map(p => p.category))];
+      const tabsContainer = document.getElementById("categoryTabs");
+      
+      tabsContainer.innerHTML = categories.map(cat => `
+        <button class="tag-btn ${cat === currentCategory ? 'active' : ''}" onclick="filterCategory('${cat}')">${cat}</button>
+      `).join('');
     }
 
-    // -----------------------------
-    // 刪除
-    // -----------------------------
-    function doDelete(password) {
-        showLoading(true, "刪除中...");
-
-        fetch(SCRIPT_URL, {
-            method: 'POST',
-            cache: "no-store",
-            headers: { "Content-Type": "text/plain;charset=utf-8" },
-            body: JSON.stringify({
-                action: 'delete',
-                password: password,
-                id: String(targetId)
-            })
-        })
-        .then(res => res.json())
-        .then(data => {
-            if (data && data.status === 'success') {
-                alert("刪除成功");
-
-                // 修正：避免 id 型別不一致造成刪不掉
-                allPhotos = allPhotos.filter(p => String(p.id) !== String(targetId));
-
-                renderUI();
-            } else {
-                alert("失敗: " + (data?.message || "未知錯誤"));
-            }
-        })
-        .catch(err => {
-            console.error(err);
-            alert("連線錯誤");
-        })
-        .finally(() => showLoading(false));
+    // 切換分類檢視
+    function filterCategory(cat) {
+      currentCategory = cat;
+      buildCategoryTabs();
+      renderGallery();
     }
 
-    // -----------------------------
-    // 渲染 UI
-    // -----------------------------
-    function renderUI() {
-        const catBox = document.getElementById('filterBox');
-        const galleryBox = document.getElementById('galleryBox');
+    // 渲染卡片畫面
+    function renderGallery() {
+      const container = document.getElementById("photoGallery");
+      const list = currentCategory === "全部" 
+        ? photosData 
+        : photosData.filter(p => p.category === currentCategory);
 
-        if (!allPhotos || allPhotos.length === 0) {
-            catBox.innerHTML = '';
-            galleryBox.innerHTML = '<p style="text-align:center;color:#999;grid-column:1/-1">沒有照片</p>';
-            return;
-        }
+      container.innerHTML = list.map(item => {
+        // 大圖採用高畫質 thumbnail 參數 (w1600)
+        const bigImageUrl = item.url.replace('&sz=w800', '&sz=w1600');
 
-        const cats = ['全部', ...new Set(allPhotos.map(p => p.category || "未分類"))];
-        const activeCat = document.querySelector('.filter-btn.active')?.innerText || '全部';
-
-        catBox.innerHTML = cats.map(c => `
-            <button class="filter-btn ${c === activeCat ? 'active' : ''}"
-                onclick="changeFilter('${escapeJsString(c)}', this)">
-                ${escapeHtml(c)}
-            </button>
-        `).join('');
-
-        renderGallery(activeCat);
-
-        // datalist 不放「全部」比較合理
-        document.getElementById('catList').innerHTML = cats
-            .filter(c => c !== "全部")
-            .map(c => `<option value="${escapeHtml(c)}">`)
-            .join('');
-    }
-
-    window.changeFilter = function(cat, btn) {
-        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        renderGallery(cat);
-    };
-
-    function renderGallery(filter) {
-        const box = document.getElementById('galleryBox');
-        const list = (filter === '全部')
-            ? allPhotos
-            : allPhotos.filter(p => (p.category || "未分類") === filter);
-
-        if (list.length === 0) {
-            box.innerHTML = '<p style="text-align:center;color:#999;grid-column:1/-1">無此分類照片</p>';
-            return;
-        }
-
-        box.innerHTML = list.map(p => `
-            <div class="card">
-                <div class="img-wrap">
-                    <img src="${p.url}"
-                         alt="${escapeHtml(p.name || '')}"
-                         loading="lazy"
-                         onerror="this.src='https://via.placeholder.com/200?text=Error'">
-                </div>
-                <div class="info">
-                    <div class="name" title="${escapeHtml(p.name || '')}">
-                        ${escapeHtml(p.name || '')}
-                    </div>
-                    <div class="meta">
-                        <span class="cat-tag">${escapeHtml(p.category || '未分類')}</span>
-                        <button class="btn-del" onclick="prepareDelete('${String(p.id)}')">刪除</button>
-                    </div>
-                </div>
+        return `
+          <div class="photo-card">
+            <div class="photo-thumb-wrap">
+              <!-- 【放大功能】ondblclick 連按兩下放大照片 -->
+              <img class="photo-thumb" 
+                   src="${item.url}" 
+                   alt="${item.name}" 
+                   title="連按兩下放大照片"
+                   data-full="${bigImageUrl}"
+                   ondblclick="openModal(this.dataset.full)">
             </div>
-        `).join('');
+            <div class="photo-info">
+              <div class="photo-name" title="${item.name}">${item.name}</div>
+              <div class="photo-footer">
+                <span class="photo-badge">${item.category}</span>
+                <button class="btn-delete" onclick="deletePhotoItem('${item.id}')">刪除</button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
     }
 
-    // -----------------------------
-    // Loading
-    // -----------------------------
-    function showLoading(show, text) {
-        const el = document.getElementById('loadingOverlay');
-        const txt = document.getElementById('loadingText');
-        const btn = document.getElementById('forceCloseBtn');
-        const spinner = document.getElementById('spinner');
-
-        if (show) {
-            el.style.display = 'flex';
-            el.style.opacity = '1';
-
-            if (text) txt.innerText = text;
-            btn.style.display = 'none';
-            spinner.style.display = 'block';
-
-            setTimeout(() => {
-                if (el.style.display === 'flex') btn.style.display = 'block';
-            }, 15000);
-
-        } else {
-            el.style.opacity = '0';
-            setTimeout(() => {
-                if (el.style.opacity === '0') el.style.display = 'none';
-            }, 300);
-        }
+    // ====================================================
+    // 放大與還原控制邏輯
+    // ====================================================
+    function openModal(imageSrc) {
+      const modal = document.getElementById("imageModal");
+      const modalImg = document.getElementById("modalImg");
+      modalImg.src = imageSrc;
+      modal.classList.add("active");
     }
 
-    window.forceHideLoading = () => {
-        document.getElementById('loadingOverlay').style.display = 'none';
-    };
-
-    // -----------------------------
-    // 安全處理
-    // -----------------------------
-    function escapeHtml(str) {
-        return String(str)
-            .replaceAll("&", "&amp;")
-            .replaceAll("<", "&lt;")
-            .replaceAll(">", "&gt;")
-            .replaceAll('"', "&quot;")
-            .replaceAll("'", "&#039;");
+    function closeModal() {
+      const modal = document.getElementById("imageModal");
+      const modalImg = document.getElementById("modalImg");
+      modal.classList.remove("active");
+      modalImg.src = "";
     }
 
-    // 避免分類名稱含 ' 造成 onclick 壞掉
-    function escapeJsString(str) {
-        return String(str).replaceAll("\\", "\\\\").replaceAll("'", "\\'");
-    }
-
-    // -----------------------------
-    // 初始化
-    // -----------------------------
-    function initApp() {
-        if (!SCRIPT_URL || SCRIPT_URL.length < 20) {
-            document.getElementById('loadingText').innerText = "錯誤：SCRIPT_URL 網址無效";
-            document.getElementById('spinner').style.display = 'none';
-            document.getElementById('forceCloseBtn').style.display = 'block';
-            return;
-        }
-        fetchPhotos();
-    }
-
-    initApp();
-
-    window.addEventListener('load', () => {
-        if (!hasLoadedOnce && !isFetching) initApp();
+    // 鍵盤按 ESC 亦可關閉
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") closeModal();
     });
 
-    setTimeout(() => {
-        if (!hasLoadedOnce && !isFetching) initApp();
-    }, 2000);
-</script>
+    // 刪除相片
+    async function deletePhotoItem(id) {
+      const pwd = prompt("請輸入管理密碼：");
+      if (!pwd) return;
 
+      try {
+        const res = await fetch(GAS_API_URL, {
+          method: "POST",
+          body: JSON.stringify({ action: "delete", id: id, password: pwd })
+        });
+        const result = await res.json();
+        if (result.status === "success") {
+          alert("刪除成功");
+          loadPhotos();
+        } else {
+          alert("刪除失敗：" + result.message);
+        }
+      } catch(e) {
+        alert("請求失敗");
+      }
+    }
+
+    // 批次上傳
+    async function startBatchUpload() {
+      const fileInput = document.getElementById("fileInput");
+      const files = fileInput.files;
+      const category = document.getElementById("categoryInput").value.trim() || "未分類";
+
+      if (!files.length) {
+        alert("請選擇照片");
+        return;
+      }
+      const pwd = prompt("請輸入管理密碼：");
+      if (!pwd) return;
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const base64 = await fileToBase64(file);
+        
+        await fetch(GAS_API_URL, {
+          method: "POST",
+          body: JSON.stringify({
+            action: "upload",
+            category: category,
+            filename: file.name,
+            mimeType: file.type,
+            file: base64,
+            password: pwd
+          })
+        });
+      }
+      alert("上傳完成！");
+      fileInput.value = "";
+      loadPhotos();
+    }
+
+    function fileToBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = error => reject(error);
+      });
+    }
+  </script>
 </body>
 </html>
