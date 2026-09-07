@@ -1,482 +1,216 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>遺失物品照片瀏覽與管理系統</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>遺失物品管理系統</title>
   <style>
     :root {
-      --primary-color: #2563eb;
-      --danger-color: #ef4444;
-      --bg-color: #f8fafc;
+      --primary: #3b82f6;
+      --bg: #f8fafc;
       --card-bg: #ffffff;
+      --text: #1e293b;
     }
 
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); padding: 20px; }
+    .container { max-width: 1200px; margin: 0 auto; }
+    
+    header { text-align: center; margin-bottom: 24px; }
+    h1 { font-size: 1.8rem; margin-bottom: 8px; }
+    .subtitle { color: #64748b; font-size: 0.95rem; }
 
-    body {
-      background-color: var(--bg-color);
-      color: #334155;
-      padding: 20px;
-    }
+    /* 篩選與工具列 */
+    .toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; background: var(--card-bg); padding: 16px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .filter-group { display: flex; align-items: center; gap: 8px; }
+    select, input[type="text"], input[type="password"] { padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; }
+    
+    /* 相片列表網格 (維持原版面設計) */
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 20px; }
+    .card { background: var(--card-bg); border-radius: 10px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.06); transition: transform 0.2s, box-shadow 0.2s; position: relative; }
+    .card:hover { transform: translateY(-3px); box-shadow: 0 4px 12px rgba(0,0,0,0.12); }
+    
+    .img-wrap { width: 100%; height: 200px; background: #e2e8f0; overflow: hidden; position: relative; }
+    .img-wrap img { width: 100%; height: 100%; object-fit: cover; cursor: pointer; user-select: none; }
+    
+    .card-body { padding: 12px; }
+    .card-tag { display: inline-block; font-size: 12px; padding: 2px 8px; background: #e0f2fe; color: #0284c7; border-radius: 4px; margin-bottom: 6px; }
+    .card-title { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-    .container {
-      max-width: 1200px;
-      margin: 0 auto;
-    }
-
-    header {
-      text-align: center;
-      margin-bottom: 25px;
-    }
-
-    header h1 {
-      font-size: 26px;
-      margin-bottom: 8px;
-      color: #1e293b;
-    }
-
-    header p {
-      font-size: 14px;
-      color: #64748b;
-    }
-
-    /* 管理面板與操作列 */
-    .control-panel {
-      background: var(--card-bg);
-      padding: 16px;
-      border-radius: 10px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-      margin-bottom: 20px;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .filter-group, .admin-group {
-      display: flex;
-      gap: 10px;
-      align-items: center;
-      flex-wrap: wrap;
-    }
-
-    select, input, button {
-      padding: 8px 12px;
-      border: 1px solid #cbd5e1;
-      border-radius: 6px;
-      font-size: 14px;
-    }
-
-    button {
-      background-color: var(--primary-color);
-      color: white;
-      border: none;
-      cursor: pointer;
-      font-weight: 500;
-      transition: background-color 0.2s;
-    }
-
-    button:hover {
-      opacity: 0.9;
-    }
-
-    /* 照片卡片網格 */
-    .photo-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-      gap: 18px;
-    }
-
-    .photo-card {
-      background: var(--card-bg);
-      border-radius: 8px;
-      overflow: hidden;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.06);
-      display: flex;
-      flex-direction: column;
-      position: relative;
-    }
-
-    .img-wrapper {
-      position: relative;
-      width: 100%;
-      padding-top: 75%; /* 4:3 比例 */
-      background-color: #e2e8f0;
-      overflow: hidden;
-      cursor: pointer;
-    }
-
-    .img-wrapper img {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      transition: transform 0.25s ease;
-      user-select: none;
-    }
-
-    .img-wrapper:hover img {
-      transform: scale(1.04);
-    }
-
-    .img-badge {
-      position: absolute;
-      bottom: 8px;
-      right: 8px;
-      background: rgba(0,0,0,0.6);
-      color: white;
-      font-size: 11px;
-      padding: 3px 6px;
-      border-radius: 4px;
-      pointer-events: none;
-    }
-
-    .card-info {
-      padding: 12px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .card-info .category {
-      display: inline-block;
-      align-self: flex-start;
-      background-color: #e0e7ff;
-      color: #3730a3;
-      padding: 2px 8px;
-      border-radius: 4px;
-      font-size: 12px;
-      font-weight: bold;
-    }
-
-    .card-info .name {
-      font-size: 14px;
-      font-weight: 500;
-      color: #1e293b;
-      word-break: break-all;
-    }
-
-    .card-actions {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-top: 6px;
-    }
-
-    .btn-delete {
-      background-color: var(--danger-color);
-      padding: 4px 8px;
-      font-size: 12px;
-    }
-
-    /* ========================================================== */
-    /* 【核心功能】：照片放大 Lightbox 樣式                      */
-    /* ========================================================== */
-    .photo-modal-overlay {
-      display: none; /* 預設不顯示 */
+    /* ========================================================= */
+    /* 【關鍵修改 1】照片全螢幕放大檢視層 (Modal)                */
+    /* ========================================================= */
+    .image-modal-overlay {
+      display: none;
       position: fixed;
       top: 0;
       left: 0;
       width: 100vw;
       height: 100vh;
       background-color: rgba(0, 0, 0, 0.85);
-      backdrop-filter: blur(4px);
-      z-index: 9999;
+      z-index: 99999;
       justify-content: center;
       align-items: center;
-      flex-direction: column;
       cursor: pointer;
-      user-select: none;
-      animation: fadeIn 0.2s ease-in-out;
+      opacity: 0;
+      transition: opacity 0.2s ease-in-out;
     }
 
-    .photo-modal-overlay img {
+    .image-modal-overlay.active {
+      display: flex;
+      opacity: 1;
+    }
+
+    .image-modal-overlay img {
       max-width: 90vw;
-      max-height: 85vh;
+      max-height: 90vh;
       object-fit: contain;
-      border-radius: 6px;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-      cursor: zoom-out; /* 提示再點一下關閉 */
+      border-radius: 8px;
+      box-shadow: 0 4px 25px rgba(0, 0, 0, 0.5);
+      cursor: pointer;
+      transform: scale(0.95);
+      transition: transform 0.2s ease-in-out;
     }
 
-    .photo-modal-caption {
-      color: #f1f5f9;
-      margin-top: 14px;
-      font-size: 14px;
-      background: rgba(0, 0, 0, 0.6);
-      padding: 6px 16px;
-      border-radius: 20px;
+    .image-modal-overlay.active img {
+      transform: scale(1);
     }
 
-    @keyframes fadeIn {
-      from { opacity: 0; }
-      to { opacity: 1; }
-    }
-
-    /* 載入中狀態提示 */
-    .loading-text {
-      grid-column: 1 / -1;
-      text-align: center;
-      padding: 40px;
-      color: #94a3b8;
-    }
+    .loading-tip { text-align: center; color: #64748b; padding: 40px; }
   </style>
 </head>
 <body>
 
-<div class="container">
-  <header>
-    <h1>遺失物品相簿系統</h1>
-    <p>💡 提示：在照片上<strong>擊點 2 下（雙擊）</strong>可放大檢視，<strong>再擊點放大的照片</strong>即可關閉。</p>
-  </header>
+  <div class="container">
+    <header>
+      <h1>遺失物品瀏覽與檢視</h1>
+      <div class="subtitle">提示：滑鼠按兩下照片可放大檢視，再按一下放大照片即可返回</div>
+    </header>
 
-  <!-- 篩選與管理區域 -->
-  <div class="control-panel">
-    <div class="filter-group">
-      <label for="categoryFilter">分類篩選：</label>
-      <select id="categoryFilter" onchange="renderPhotos()">
-        <option value="all">全部分類</option>
-      </select>
-      <button onclick="loadPhotos()">重新整理</button>
+    <div class="toolbar">
+      <div class="filter-group">
+        <label for="categoryFilter">分類篩選：</label>
+        <select id="categoryFilter" onchange="filterPhotos()">
+          <option value="ALL">全部類別</option>
+        </select>
+      </div>
+      <div>
+        <span id="photoCount" style="font-size: 14px; color: #64748b;">載入中...</span>
+      </div>
     </div>
 
-    <!-- 上傳與管理（需要密碼） -->
-    <div class="admin-group">
-      <input type="password" id="adminPassword" placeholder="輸入管理密碼">
-      <input type="text" id="uploadCategory" placeholder="輸入物品分類">
-      <input type="file" id="fileInput" accept="image/*">
-      <button onclick="uploadPhoto()">上傳照片</button>
+    <!-- 照片清單呈現區 -->
+    <div id="photoGrid" class="grid">
+      <div class="loading-tip">正在載入物品資料...</div>
     </div>
   </div>
 
-  <!-- 照片卡片容器 -->
-  <div id="photoGrid" class="photo-grid">
-    <div class="loading-text">載入照片中...</div>
+  <!-- ========================================================= -->
+  <!-- 【關鍵修改 2】放大檢視浮層 (放置於 body 底部)             -->
+  <!-- ========================================================= -->
+  <div id="imageModal" class="image-modal-overlay" onclick="closeModal()">
+    <img id="modalImg" src="" alt="放大照片檢視" />
   </div>
-</div>
 
-<!-- ========================================================== -->
-<!-- 【核心功能】：照片放大檢視彈窗結構                        -->
-<!-- ========================================================== -->
-<div id="imageModal" class="photo-modal-overlay" onclick="closeModal()">
-  <img id="modalImg" src="" alt="放大檢視" onclick="closeModal()" title="點擊縮回原網頁" />
-  <div id="modalCaption" class="photo-modal-caption"></div>
-</div>
+  <script>
+    // 請替換為您的 Google Apps Script 部署網址 (Web App URL)
+    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxx0t3Pz5DKYrPztCw07T8akmMzCcBZ9Dlzx-a5L9EmZS181SWgKzm-Wclz7Wg5cndDnA/exec";
 
-<script>
-  // ==========================================
-  // 【設定】請換成您的 Google Apps Script 網頁應用程式 URL
-  const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxx0t3Pz5DKYrPztCw07T8akmMzCcBZ9Dlzx-a5L9EmZS181SWgKzm-Wclz7Wg5cndDnA/exec";
-  // ==========================================
+    let allPhotos = [];
 
-  let allPhotos = [];
-
-  // 初始化載入照片
-  window.onload = function() {
-    loadPhotos();
-  };
-
-  // 取得照片資料
-  async function loadPhotos() {
-    const grid = document.getElementById('photoGrid');
-    grid.innerHTML = '<div class="loading-text">讀取照片中，請稍候...</div>';
-    
-    try {
-      const res = await fetch(GAS_API_URL);
-      allPhotos = await res.json();
-      updateCategoryOptions();
-      renderPhotos();
-    } catch (err) {
-      grid.innerHTML = '<div class="loading-text" style="color:red">無法取得照片資料，請確認後端網址或權限。</div>';
-    }
-  }
-
-  // 更新分類下拉選單
-  function updateCategoryOptions() {
-    const filter = document.getElementById('categoryFilter');
-    const categories = Array.from(new Set(allPhotos.map(p => p.category)));
-    
-    filter.innerHTML = '<option value="all">全部分類</option>';
-    categories.forEach(cat => {
-      const opt = document.createElement('option');
-      opt.value = cat;
-      opt.textContent = cat;
-      filter.appendChild(opt);
-    });
-  }
-
-  // 渲染照片清單到畫面上
-  function renderPhotos() {
-    const grid = document.getElementById('photoGrid');
-    const selectedCategory = document.getElementById('categoryFilter').value;
-    
-    const filtered = selectedCategory === 'all' 
-      ? allPhotos 
-      : allPhotos.filter(p => p.category === selectedCategory);
-
-    if (filtered.length === 0) {
-      grid.innerHTML = '<div class="loading-text">目前沒有符合的照片。</div>';
-      return;
+    // 初始化載入相片
+    async function loadPhotos() {
+      try {
+        const res = await fetch(GAS_API_URL);
+        allPhotos = await res.json();
+        
+        setupCategories(allPhotos);
+        renderPhotos(allPhotos);
+      } catch (err) {
+        document.getElementById('photoGrid').innerHTML = `<div class="loading-tip">資料載入失敗: ${err.message}</div>`;
+      }
     }
 
-    grid.innerHTML = '';
-    filtered.forEach(photo => {
-      const card = document.createElement('div');
-      card.className = 'photo-card';
+    // 動態建立分類下拉選項
+    function setupCategories(photos) {
+      const categories = [...new Set(photos.map(p => p.category || "未分類"))];
+      const select = document.getElementById('categoryFilter');
+      categories.forEach(cat => {
+        const opt = document.createElement('option');
+        opt.value = cat;
+        opt.textContent = cat;
+        select.appendChild(opt);
+      });
+    }
 
-      // 產生卡片內容
-      card.innerHTML = `
-        <div class="img-wrapper" title="擊點 2 下放大照片">
-          <img src="${photo.url}" alt="${photo.name}" loading="lazy" />
-          <span class="img-badge">雙擊放大</span>
-        </div>
-        <div class="card-info">
-          <span class="category">${photo.category}</span>
-          <span class="name">${photo.name}</span>
-          <div class="card-actions">
-            <a href="${photo.viewUrl}" target="_blank" style="font-size:12px;color:var(--primary-color);">雲端開啟</a>
-            <button class="btn-delete" onclick="deletePhoto('${photo.id}')">刪除</button>
+    // 渲染卡片
+    function renderPhotos(photos) {
+      const grid = document.getElementById('photoGrid');
+      const countLabel = document.getElementById('photoCount');
+      countLabel.textContent = `共 ${photos.length} 件物品`;
+
+      if (photos.length === 0) {
+        grid.innerHTML = '<div class="loading-tip">目前沒有任何照片</div>';
+        return;
+      }
+
+      grid.innerHTML = photos.map(photo => `
+        <div class="card">
+          <div class="img-wrap">
+            <!-- 【關鍵修改 3】綁定 ondblclick 雙擊事件 -->
+            <img 
+              src="${photo.url}" 
+              alt="${photo.name}" 
+              title="按兩下放大照片"
+              ondblclick="zoomPhoto('${photo.url}')"
+              loading="lazy"
+            />
+          </div>
+          <div class="card-body">
+            <span class="card-tag">${photo.category}</span>
+            <div class="card-title" title="${photo.name}">${photo.name}</div>
           </div>
         </div>
-      `;
-
-      // 綁定【雙擊放大】事件
-      const imgElem = card.querySelector('.img-wrapper img');
-      setupDoubleTapZoom(imgElem, photo.url, `${photo.category} - ${photo.name}`);
-
-      grid.appendChild(card);
-    });
-  }
-
-  // ==========================================================
-  // 【核心功能】：雙擊放大與手機觸控雙擊相容處理
-  // ==========================================================
-  function setupDoubleTapZoom(imgElement, imgUrl, captionText) {
-    // 1. 桌機瀏覽器原生雙擊事件
-    imgElement.addEventListener('dblclick', function(e) {
-      e.stopPropagation();
-      openModal(imgUrl, captionText);
-    });
-
-    // 2. 行動裝置觸控螢幕連點 2 下（相容處理）
-    let lastTap = 0;
-    imgElement.addEventListener('touchend', function(e) {
-      const currentTime = new Date().getTime();
-      const tapLength = currentTime - lastTap;
-      if (tapLength < 350 && tapLength > 0) {
-        // 判定為雙擊
-        e.preventDefault();
-        openModal(imgUrl, captionText);
-      }
-      lastTap = currentTime;
-    });
-  }
-
-  // 開啟放大圖片
-  function openModal(url, caption) {
-    const modal = document.getElementById('imageModal');
-    const modalImg = document.getElementById('modalImg');
-    const modalCaption = document.getElementById('modalCaption');
-
-    // 關鍵優化：將原本的縮圖 sz=w800 調成 sz=w1600，放大檢視細節更清晰
-    const hdUrl = url.replace('sz=w800', 'sz=w1600');
-
-    modalImg.src = hdUrl;
-    modalCaption.textContent = `${caption} （點擊放大照片即可縮回）`;
-    modal.style.display = 'flex';
-    document.body.style.overflow = 'hidden'; // 鎖定背景避免捲動
-  }
-
-  // 點擊放大的照片，關閉並回到原網頁
-  function closeModal() {
-    const modal = document.getElementById('imageModal');
-    modal.style.display = 'none';
-    document.getElementById('modalImg').src = "";
-    document.body.style.overflow = 'auto'; // 恢復背景捲動
-  }
-
-  // ==========================================================
-  // 刪除與上傳邏輯
-  // ==========================================================
-  async function deletePhoto(fileId) {
-    const pwd = document.getElementById('adminPassword').value;
-    if (!pwd) {
-      alert("請先在上方輸入管理密碼！");
-      return;
+      `).join('');
     }
-    if (!confirm("確定要刪除這張照片嗎？")) return;
 
-    try {
-      const res = await fetch(GAS_API_URL, {
-        method: "POST",
-        body: JSON.stringify({
-          action: "delete",
-          id: fileId,
-          password: pwd
-        })
-      });
-      const result = await res.json();
-      if (result.status === 'success') {
-        alert("刪除成功！");
-        loadPhotos();
+    // 依分類篩選
+    function filterPhotos() {
+      const selected = document.getElementById('categoryFilter').value;
+      if (selected === 'ALL') {
+        renderPhotos(allPhotos);
       } else {
-        alert("刪除失敗：" + (result.message || "密碼錯誤"));
+        renderPhotos(allPhotos.filter(p => p.category === selected));
       }
-    } catch(err) {
-      alert("連線錯誤: " + err);
     }
-  }
 
-  async function uploadPhoto() {
-    const pwd = document.getElementById('adminPassword').value;
-    const cat = document.getElementById('uploadCategory').value.trim();
-    const fileInput = document.getElementById('fileInput');
+    // =========================================================
+    // 【關鍵修改 4】放大與關閉的控制函式
+    // =========================================================
+    // 雙擊放大
+    function zoomPhoto(src) {
+      const modal = document.getElementById('imageModal');
+      const modalImg = document.getElementById('modalImg');
+      
+      // 自動將 Google Drive 的縮圖尺寸提升至 w2000，確保全螢幕放大後畫質清晰
+      modalImg.src = src.replace('sz=w800', 'sz=w2000');
+      modal.classList.add('active');
+    }
 
-    if (!pwd) return alert("請輸入管理密碼！");
-    if (!cat) return alert("請輸入物品分類！");
-    if (!fileInput.files || fileInput.files.length === 0) return alert("請選擇要上傳的照片！");
+    // 單擊關閉返回原畫面
+    function closeModal() {
+      const modal = document.getElementById('imageModal');
+      modal.classList.remove('active');
+      document.getElementById('modalImg').src = '';
+    }
 
-    const file = fileInput.files[0];
-    const reader = new FileReader();
+    // 支援按鍵盤 ESC 鍵亦可關閉
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') closeModal();
+    });
 
-    reader.onload = async function(e) {
-      const base64 = e.target.result;
-      try {
-        const res = await fetch(GAS_API_URL, {
-          method: "POST",
-          body: JSON.stringify({
-            action: "upload",
-            file: base64,
-            category: cat,
-            filename: file.name,
-            mimeType: file.type,
-            password: pwd
-          })
-        });
-        const result = await res.json();
-        if (result.status === 'success') {
-          alert(`上傳成功！編號檔名：${result.name}`);
-          fileInput.value = "";
-          loadPhotos();
-        } else {
-          alert("上傳失敗：" + result.message);
-        }
-      } catch (err) {
-        alert("上傳發生錯誤：" + err);
-      }
-    };
-
-    reader.readAsDataURL(file);
-  }
-</script>
+    // 頁面載入後執行
+    window.onload = loadPhotos;
+  </script>
 </body>
 </html>
